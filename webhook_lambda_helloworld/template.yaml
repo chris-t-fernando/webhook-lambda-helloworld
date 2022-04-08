@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  webhook_lambda_helloworld
+
+  Sample SAM Template for webhook_lambda_helloworld
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+  Api:
+    EndpointConfiguration: REGIONAL
+    # Your CORS hosts need to be in this format - note the two layers of quotes.
+    Cors: "'*'"
+
+Resources:
+  WebhookFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: hello_world/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Architectures:
+        - x86_64
+      Events:
+        Get:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#ap
+          Properties:
+            RestApiId:
+              Ref: WebhookApiGateway
+            Path: /hello
+            Method: GET
+
+  WebhookApiGateway:
+    Type: AWS::Serverless::Api
+    DependsOn: WebhookFunction
+    Properties:
+      Name: helloworld
+      StageName: dev
+      DefinitionBody:
+        #      swagger: 2.0
+        openapi: "3.0.1"
+        info:
+          version: "1.0"
+          title: "Helloworld webook API endpoint"
+        #      basepath: /dev
+        #      schemes:
+        #        - "https"
+        paths:
+          /hello:
+            get:
+              responses: {}
+              #                200:
+              #                  description: "OK"
+              #                  content: {}
+              x-amazon-apigateway-integration:
+                uri:
+                  #!GetAtt WebhookFunction.Arn
+                  # You need to build up the ARN with this pattern - you can't just use a !Ref or !GetAtt AFAIK.
+                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebhookFunction.Arn}/invocations
+                passthroughBehavior: "when_no_match"
+                httpMethod: "POST"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
